@@ -1,0 +1,205 @@
+backend:
+
+//update routes
+
+app.post("/updatesamepath/current", upload.single("pdf"), async (req, res, next) => {
+  const articledata=req.body;
+  articledata.year= +req.body.year;
+  articledata.volume= +req.body.volume;
+  articledata.issue= +req.body.issue;
+
+  if (req.file === undefined) {
+    try {
+      const connection = await mongoClient.connect(URL);
+
+      const db = connection.db(DB);
+
+      let data = await db
+        .collection("currentissues")
+        .updateOne({ _id: new mongodb.ObjectId(req.query.id) }, { $set:articledata });
+
+      await connection.close();
+
+      res.json({ message: "success" });
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ message: "try again later" });
+    }
+  } else {
+    try {
+      const connection = await mongoClient.connect(URL);
+
+      const db = connection.db(DB);
+
+      let data = await db
+        .collection("currentissues")
+        .updateOne({ _id: new mongodb.ObjectId(req.query.id) }, { $set: articledata });
+      const path = `../project2/public/uploads/Volume-${req.query.volume}/Issue-${req.query.issue}/${req.file.originalname}`;
+      let pdffile = await db
+        .collection("currentissues")
+        .updateOne(
+          { _id: new mongodb.ObjectId(req.query.id) },
+          { $set: { pdfdata: req.file, destination: path } }
+        );
+
+      var oldfilePath = `../project2/public/uploads/Volume-${articledata.volume}/Issue-${articledata.issue}/${req.query.oldfile}`;
+      fs.unlinkSync(oldfilePath);
+      await connection.close();
+
+      res.json({ message: "success" });
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ message: "try again later" });
+    }
+  }
+});
+
+
+
+
+app.post("/updatediffrentpath/current",
+  upload.single("pdf"),
+  async (req, res, next) => {
+    const articledata=req.body;
+  articledata.year= +req.body.year;
+  articledata.volume= +req.body.volume;
+  articledata.issue= +req.body.issue;
+
+
+    console.log(req.query.oldPath);
+
+    if (req.file === undefined) {
+      try {
+        const connection = await mongoClient.connect(URL);
+
+        const db = connection.db(DB);
+        var fileoldPath = `${articledata.destination}`;
+        var newdestination = `../project2/public/uploads/Volume-${articledata.volume}/Issue-${articledata.issue}`;
+        if (!fs.existsSync(newdestination)) {
+          fs.mkdirSync(newdestination, { recursive: true });
+        }
+        var newPath = `../project2/public/uploads/Volume-${articledata.volume}/Issue-${articledata.issue}/${req.query.oldfile}`;
+
+        fs.rename(fileoldPath, newPath, function (err) {
+          if (err) throw err;
+          console.log("Successfully moved!");
+        });
+        let data = await db
+          .collection("currentissues")
+          .updateOne(
+            { _id: new mongodb.ObjectId(req.query.id) },
+            { $set:articledata}
+          );
+
+        let pdffile = await db.collection("currentissues").updateOne(
+          { _id: new mongodb.ObjectId(req.query.id) },
+          {
+            $set: {
+              destination: newPath,
+              "pdfdata.path": newPath,
+              "pdfdata.destination": newdestination,
+            },
+          }
+        );
+
+        await connection.close();
+
+        res.json({ message: "success" });
+      } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: "try again later" });
+      }
+    } else {
+      try {
+        const connection = await mongoClient.connect(URL);
+
+        const db = connection.db(DB);
+
+        var newPath = `../project2/public/uploads/Volume-${articledata.volume}/Issue-${articledata.issue}/${req.file.originalname}`;
+
+        fs.unlinkSync(articledata.destination);
+
+        let data = await db
+          .collection("currentissues")
+          .updateOne(
+            { _id: new mongodb.ObjectId(req.query.id) },
+            { $set:articledata }
+          );
+
+        let pdffile = await db.collection("currentissues").updateOne(
+          { _id: new mongodb.ObjectId(req.query.id) },
+          {
+            $set: {
+              pdfdata: req.file,
+              destination: newPath,
+            },
+          }
+        );
+
+        await connection.close();
+
+        res.json({ message: "success" });
+      } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: "try again later" });
+      }
+    }
+  }
+);
+
+//create
+app.post("/createnew", upload.single("pdf"), async (req, res, next) => {
+  const articledata=req.body;
+  articledata.year= +req.body.year;
+  articledata.volume= +req.body.volume;
+  articledata.issue= +req.body.issue;
+
+  try {
+    const connection = await mongoClient.connect(URL);
+
+    const db = connection.db(DB);
+
+    const data = await db.collection("currentissues").insertOne(articledata);
+    const mongoid = data.insertedId;
+    const path = `../project2/public/uploads/Volume-${req.query.volume}/Issue-${req.query.issue}/${req.file.originalname}`;
+    let pdffile = await db
+      .collection("currentissues")
+      .updateOne(
+        { _id: mongoid },
+        { $set: { pdfdata: req.file, destination: path } }
+      );
+
+    await connection.close();
+
+    res.json({ message: "success" });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "try again later" });
+  }
+});
+
+
+//get by id 
+
+router.get('/get/:issuesID', (req, res) => {
+    try{
+        CURRENTISSUES.findOne({article: req.params.issuesID}).then((data) => {
+        
+
+            res.status(200).send(data);
+        })
+
+    }catch(error){
+        res.status(500).send({
+            message: 'Internal Server Error', 
+        })
+    }
+});
+
+
+
+
+
+
+
+
